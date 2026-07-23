@@ -6,7 +6,7 @@ import yfinance as yf
 from datetime import datetime
 import os
 
-# Arquivo onde a carteira será salva permanentemente
+# Arquivo onde a carteira é salva permanentemente
 ARQUIVO_CARTEIRA = "carteira.csv"
 
 # Configuração da Página
@@ -15,6 +15,53 @@ st.set_page_config(
     page_icon="💰",
     layout="wide"
 )
+
+# CREDENCIAIS DE ACESSO (Pode alterar aqui para a senha que desejar)
+USUARIO_CORRETO = "admin"
+SENHA_CORRETA = "1234"
+
+# Gerenciamento de Estado de Autenticação
+if 'autenticado' not in st.session_state:
+    st.session_state.autenticado = False
+
+# ==============================================================================
+# TELA DE LOGIN
+# ==============================================================================
+if not st.session_state.autenticado:
+    st.title("🔒 Acesso Restrito")
+    st.subheader("Faça login para acessar o Gestor de Carteira")
+    
+    col_login, _ = st.columns([1, 2])
+    with col_login:
+        with st.form("form_login"):
+            usuario_input = st.text_input("Usuário")
+            senha_input = st.text_input("Senha", type="password")
+            botao_login = st.form_submit_button("Entrar no Sistema")
+            
+            if botao_login:
+                if usuario_input == USUARIO_CORRETO and senha_input == SENHA_CORRETA:
+                    st.session_state.autenticado = True
+                    st.success("Acesso liberado!")
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+    st.stop() # Interrompe a execução do restante do código até estar autenticado
+
+# ==============================================================================
+# APLICAÇÃO PRINCIPAL (Liberada após o Login)
+# ==============================================================================
+
+# Estilo Personalizado
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #1e222d;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #2e3545;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Função para carregar dados do arquivo CSV
 def carregar_dados():
@@ -48,7 +95,15 @@ def obter_dados_ativo(ticker):
     except Exception:
         return 0.0, 0.0
 
-st.title("💰 Gestor de Carteira & Simulador de Investimentos")
+# Cabeçalho Superior com Botão de Sair (Logout)
+col_titulo, col_logout = st.columns([5, 1])
+with col_titulo:
+    st.title("💰 Gestor de Carteira & Simulador de Investimentos")
+with col_logout:
+    st.write("")
+    if st.button("🚪 Sair / Logout"):
+        st.session_state.autenticado = False
+        st.rerun()
 
 # Criação das 3 Abas
 aba_carteira, aba_simulador, aba_metas = st.tabs([
