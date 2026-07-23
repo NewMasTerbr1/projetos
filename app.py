@@ -203,7 +203,7 @@ with aba_carteira:
                     'Preço Médio (R$)': round(preco_medio, 2),
                     'Preço Atual (R$)': round(preco_atual, 2),
                     'Valor Total (R$)': round(valor_atual_total, 2),
-                    'Dividendo Estimado(R$)': round(provento_estimado_mes, 2),
+                    'Provento Estimado/Mês (R$)': round(provento_estimado_mes, 2),
                     'Data Pagamento': data_pag
                 })
             
