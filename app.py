@@ -16,7 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# CREDENCIAIS DE ACESSO (Pode alterar aqui para a senha que desejar)
+# CREDENCIAIS DE ACESSO
 USUARIO_CORRETO = "thiago"
 SENHA_CORRETA = "3397"
 
@@ -45,13 +45,12 @@ if not st.session_state.autenticado:
                     st.rerun()
                 else:
                     st.error("Usuário ou senha incorretos.")
-    st.stop() # Interrompe a execução do restante do código até estar autenticado
+    st.stop()
 
 # ==============================================================================
 # APLICAÇÃO PRINCIPAL (Liberada após o Login)
 # ==============================================================================
 
-# Estilo Personalizado
 st.markdown("""
 <style>
     .metric-card {
@@ -63,7 +62,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Função para carregar dados do arquivo CSV
 def carregar_dados():
     if os.path.exists(ARQUIVO_CARTEIRA):
         try:
@@ -72,15 +70,13 @@ def carregar_dados():
             pass
     return pd.DataFrame(columns=['Data', 'Ticker', 'Tipo', 'Quantidade', 'Preco_Pago'])
 
-# Função para salvar dados no arquivo CSV
 def salvar_dados(df):
     df.to_csv(ARQUIVO_CARTEIRA, index=False)
 
-# Inicializa as transações a partir do arquivo salvo
 if 'transacoes' not in st.session_state:
     st.session_state.transacoes = carregar_dados()
 
-# Função para buscar cotação e dividendo via yfinance
+# Função para buscar cotação, dividendo e data de pagamento via yfinance
 @st.cache_data(ttl=3600)
 def obter_dados_ativo(ticker):
     try:
@@ -91,11 +87,18 @@ def obter_dados_ativo(ticker):
         preco_atual = info.get('currentPrice') or info.get('regularMarketPrice') or 0.0
         dividendo_ultimo = info.get('lastDividendValue') or 0.0
         
-        return float(preco_atual), float(dividendo_ultimo)
+        # Busca a data do provento/pagamento no yfinance
+        data_div_timestamp = info.get('exDividendDate') or info.get('dividendDate')
+        if data_div_timestamp:
+            data_pagamento = datetime.fromtimestamp(data_div_timestamp).strftime("%d/%m/%Y")
+        else:
+            data_pagamento = "A definir"
+        
+        return float(preco_atual), float(dividendo_ultimo), data_pagamento
     except Exception:
-        return 0.0, 0.0
+        return 0.0, 0.0, "Indisponível"
 
-# Cabeçalho Superior com Botão de Sair (Logout)
+# Cabeçalho Superior com Botão de Sair
 col_titulo, col_logout = st.columns([5, 1])
 with col_titulo:
     st.title("💰 Gestor de Investimentos")
@@ -143,7 +146,6 @@ with aba_carteira:
                 st.success(f"Registradas {qtd_cotas} cotas de {ticker_input} e salvas permanentemente!")
                 st.rerun()
 
-        # ÁREA DE GERENCIAMENTO / DELETAR
         st.markdown("---")
         st.subheader("⚙️ Gerenciar Lançamentos")
         
@@ -176,6 +178,7 @@ with aba_carteira:
             
             df_trans = st.session_state.transacoes
             resumo_list = []
+            datas_pagamento = []
             
             for ticker in df_trans['Ticker'].unique():
                 df_ticker = df_trans[df_trans['Ticker'] == ticker]
@@ -183,12 +186,15 @@ with aba_carteira:
                 custo_total = (df_ticker['Quantidade'] * df_ticker['Preco_Pago']).sum()
                 preco_medio = custo_total / total_cotas if total_cotas > 0 else 0
                 
-                preco_atual, ult_div = obter_dados_ativo(ticker)
+                preco_atual, ult_div, data_pag = obter_dados_ativo(ticker)
                 if preco_atual == 0.0:
                     preco_atual = preco_medio
                 
                 valor_atual_total = total_cotas * preco_atual
                 provento_estimado_mes = total_cotas * ult_div
+                
+                if data_pag not in ["A definir", "Indisponível"]:
+                    datas_pagamento.append(data_pag)
                 
                 resumo_list.append({
                     'Ticker': ticker,
@@ -197,7 +203,8 @@ with aba_carteira:
                     'Preço Médio (R$)': round(preco_medio, 2),
                     'Preço Atual (R$)': round(preco_atual, 2),
                     'Valor Total (R$)': round(valor_atual_total, 2),
-                    'Provento Estimado/Mês (R$)': round(provento_estimado_mes, 2)
+                    'Provento Estimado/Mês (R$)': round(provento_estimado_mes, 2),
+                    'Data Pagamento': data_pag
                 })
             
             df_resumo = pd.DataFrame(resumo_list)
@@ -205,10 +212,15 @@ with aba_carteira:
             patrimonio_total = df_resumo['Valor Total (R$)'].sum()
             proventos_totais_mes = df_resumo['Provento Estimado/Mês (R$)'].sum()
             
-            col_m1, col_m2, col_m3 = st.columns(3)
+            # Exibe a data do pagamento mais recente ou lista única
+            data_exibicao = datas_pagamento[0] if datas_pagamento else "A definir"
+            
+            # Quatro cards superiores
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             col_m1.metric("Patrimônio Total", f"R$ {patrimonio_total:,.2f}")
             col_m2.metric("Proventos Estimados/Mês", f"R$ {proventos_totais_mes:,.2f}")
-            col_m3.metric("Ativos Diferentes", len(df_resumo))
+            col_m3.metric("Data de Pagamento", data_exibicao)
+            col_m4.metric("Ativos Diferentes", len(df_resumo))
             
             st.dataframe(df_resumo, use_container_width=True)
             
