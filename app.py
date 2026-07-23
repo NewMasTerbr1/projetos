@@ -98,7 +98,7 @@ def obter_dados_ativo(ticker):
 # Cabeçalho Superior com Botão de Sair (Logout)
 col_titulo, col_logout = st.columns([5, 1])
 with col_titulo:
-    st.title("💰 Gestor de Carteira & Simulador de Investimentos")
+    st.title("💰 Gestor de Investimentos")
 with col_logout:
     st.write("")
     if st.button("🚪 Sair / Logout"):
