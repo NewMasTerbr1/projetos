@@ -11,14 +11,14 @@ ARQUIVO_CARTEIRA = "carteira.csv"
 
 # Configuração da Página
 st.set_page_config(
-    page_title="Simulador & Gestor de Carteira",
+    page_title="Gestor de Investimentos",
     page_icon="💰",
     layout="wide"
 )
 
 # CREDENCIAIS DE ACESSO (Pode alterar aqui para a senha que desejar)
-USUARIO_CORRETO = "admin"
-SENHA_CORRETA = "1234"
+USUARIO_CORRETO = "thiago"
+SENHA_CORRETA = "3397"
 
 # Gerenciamento de Estado de Autenticação
 if 'autenticado' not in st.session_state:
@@ -29,7 +29,7 @@ if 'autenticado' not in st.session_state:
 # ==============================================================================
 if not st.session_state.autenticado:
     st.title("🔒 Acesso Restrito")
-    st.subheader("Faça login para acessar o Gestor de Carteira")
+    st.subheader("Faça login para acessar o seu Gestor")
     
     col_login, _ = st.columns([1, 2])
     with col_login:
