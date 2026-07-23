@@ -34,14 +34,11 @@ if 'transacoes' not in st.session_state:
 @st.cache_data(ttl=3600)
 def obter_dados_ativo(ticker):
     try:
-        # Garante o sufixo .SA para ativos da B3
         ticker_b3 = f"{ticker.upper()}.SA" if not ticker.endswith(".SA") else ticker.upper()
         ativo = yf.Ticker(ticker_b3)
         info = ativo.info
         
         preco_atual = info.get('currentPrice') or info.get('regularMarketPrice') or 0.0
-        
-        # Estimar dividendo mensal médio com base no último dividendo pago
         dividendo_ultimo = info.get('lastDividendValue') or 0.0
         
         return float(preco_atual), float(dividendo_ultimo)
@@ -61,12 +58,12 @@ aba_carteira, aba_simulador, aba_metas = st.tabs([
 # ABA 1: MINHA CARTEIRA
 # ==============================================================================
 with aba_carteira:
-    st.header("Acompanhamento de Patrimonio e Compras")
+    st.header("Acompanhamento de Patrimônio e Compras")
     
     col_form, col_resumo = st.columns([1, 2])
     
     with col_form:
-        st.subheader("➕ Nova Compra / Registo")
+        st.subheader("➕ Nova Compra / Registro")
         with st.form("form_compra", clear_on_submit=True):
             data_compra = st.date_input("Data da Compra", datetime.now())
             ticker_input = st.text_input("Código do Ativo (ex: MXRF11, B3SA3, PETR4)", "MXRF11").strip().upper()
@@ -85,12 +82,39 @@ with aba_carteira:
                 }])
                 st.session_state.transacoes = pd.concat([st.session_state.transacoes, nova_transacao], ignore_index=True)
                 st.success(f"Registradas {qtd_cotas} cotas de {ticker_input} com sucesso!")
+                st.rerun()
+
+        # ÁREA DE GERENCIAMENTO / DELETAR
+        st.markdown("---")
+        st.subheader("⚙️ Gerenciar Lançamentos")
+        
+        if not st.session_state.transacoes.empty:
+            # Opção 1: Excluir um item específico
+            st.write("**Apagar um lançamento específico:**")
+            opcoes_exclusao = [f"Linha {i}: {row['Ticker']} - {row['Quantidade']} cotas em {row['Data']}" 
+                              for i, row in st.session_state.transacoes.iterrows()]
+            item_para_excluir = st.selectbox("Selecione qual deseja remover:", opcoes_exclusao)
+            
+            if st.button("🗑️ Deletar Lançamento Selecionado", type="secondary"):
+                idx_excluir = int(item_para_excluir.split(":")[0].replace("Linha ", ""))
+                st.session_state.transacoes = st.session_state.transacoes.drop(idx_excluir).reset_index(drop=True)
+                st.success("Lançamento removido!")
+                st.rerun()
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Opção 2: Zerar toda a carteira
+            st.write("**Zerar toda a carteira:**")
+            if st.button("🚨 ZERAR CARTEIRA COMPLETA", type="primary"):
+                st.session_state.transacoes = pd.DataFrame(columns=['Data', 'Ticker', 'Tipo', 'Quantidade', 'Preco_Pago'])
+                st.warning("Carteira zerada com sucesso!")
+                st.rerun()
+        else:
+            st.caption("Nenhum lançamento registrado para editar.")
 
     with col_resumo:
         if not st.session_state.transacoes.empty:
             st.subheader("📌 Resumo Consolidado")
             
-            # Agrupamento por Ativo
             df_trans = st.session_state.transacoes
             resumo_list = []
             
@@ -100,10 +124,9 @@ with aba_carteira:
                 custo_total = (df_ticker['Quantidade'] * df_ticker['Preco_Pago']).sum()
                 preco_medio = custo_total / total_cotas if total_cotas > 0 else 0
                 
-                # Busca Cotação Atual
                 preco_atual, ult_div = obter_dados_ativo(ticker)
                 if preco_atual == 0.0:
-                    preco_atual = preco_medio # Fallback caso a cotação não carregue
+                    preco_atual = preco_medio
                 
                 valor_atual_total = total_cotas * preco_atual
                 provento_estimado_mes = total_cotas * ult_div
@@ -120,7 +143,6 @@ with aba_carteira:
             
             df_resumo = pd.DataFrame(resumo_list)
             
-            # Totais
             patrimonio_total = df_resumo['Valor Total (R$)'].sum()
             proventos_totais_mes = df_resumo['Provento Estimado/Mês (R$)'].sum()
             
@@ -131,7 +153,6 @@ with aba_carteira:
             
             st.dataframe(df_resumo, use_container_width=True)
             
-            # Gráfico de Alocação por Tipo
             fig_pizz = px.pie(
                 df_resumo, values='Valor Total (R$)', names='Ticker',
                 title="Distribuição do Patrimônio por Ativo",
