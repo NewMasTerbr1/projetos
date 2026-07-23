@@ -4,6 +4,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
+import os
+
+# Arquivo onde a carteira será salva permanentemente
+ARQUIVO_CARTEIRA = "carteira.csv"
 
 # Configuração da Página
 st.set_page_config(
@@ -12,23 +16,22 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilo Personalizado
-st.markdown("""
-<style>
-    .metric-card {
-        background-color: #1e222d;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #2e3545;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Função para carregar dados do arquivo CSV
+def carregar_dados():
+    if os.path.exists(ARQUIVO_CARTEIRA):
+        try:
+            return pd.read_csv(ARQUIVO_CARTEIRA)
+        except Exception:
+            pass
+    return pd.DataFrame(columns=['Data', 'Ticker', 'Tipo', 'Quantidade', 'Preco_Pago'])
 
-# Inicialização do Histórico de Compras na Sessão
+# Função para salvar dados no arquivo CSV
+def salvar_dados(df):
+    df.to_csv(ARQUIVO_CARTEIRA, index=False)
+
+# Inicializa as transações a partir do arquivo salvo
 if 'transacoes' not in st.session_state:
-    st.session_state.transacoes = pd.DataFrame(columns=[
-        'Data', 'Ticker', 'Tipo', 'Quantidade', 'Preco_Pago'
-    ])
+    st.session_state.transacoes = carregar_dados()
 
 # Função para buscar cotação e dividendo via yfinance
 @st.cache_data(ttl=3600)
@@ -81,7 +84,8 @@ with aba_carteira:
                     'Preco_Pago': float(preco_pago)
                 }])
                 st.session_state.transacoes = pd.concat([st.session_state.transacoes, nova_transacao], ignore_index=True)
-                st.success(f"Registradas {qtd_cotas} cotas de {ticker_input} com sucesso!")
+                salvar_dados(st.session_state.transacoes)
+                st.success(f"Registradas {qtd_cotas} cotas de {ticker_input} e salvas permanentemente!")
                 st.rerun()
 
         # ÁREA DE GERENCIAMENTO / DELETAR
@@ -89,7 +93,6 @@ with aba_carteira:
         st.subheader("⚙️ Gerenciar Lançamentos")
         
         if not st.session_state.transacoes.empty:
-            # Opção 1: Excluir um item específico
             st.write("**Apagar um lançamento específico:**")
             opcoes_exclusao = [f"Linha {i}: {row['Ticker']} - {row['Quantidade']} cotas em {row['Data']}" 
                               for i, row in st.session_state.transacoes.iterrows()]
@@ -98,15 +101,16 @@ with aba_carteira:
             if st.button("🗑️ Deletar Lançamento Selecionado", type="secondary"):
                 idx_excluir = int(item_para_excluir.split(":")[0].replace("Linha ", ""))
                 st.session_state.transacoes = st.session_state.transacoes.drop(idx_excluir).reset_index(drop=True)
-                st.success("Lançamento removido!")
+                salvar_dados(st.session_state.transacoes)
+                st.success("Lançamento removido e atualizado no arquivo!")
                 st.rerun()
             
             st.markdown("<br>", unsafe_allow_html=True)
-            # Opção 2: Zerar toda a carteira
             st.write("**Zerar toda a carteira:**")
             if st.button("🚨 ZERAR CARTEIRA COMPLETA", type="primary"):
                 st.session_state.transacoes = pd.DataFrame(columns=['Data', 'Ticker', 'Tipo', 'Quantidade', 'Preco_Pago'])
-                st.warning("Carteira zerada com sucesso!")
+                salvar_dados(st.session_state.transacoes)
+                st.warning("Carteira zerada e mantida limpa!")
                 st.rerun()
         else:
             st.caption("Nenhum lançamento registrado para editar.")
